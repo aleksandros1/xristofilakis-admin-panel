@@ -220,7 +220,7 @@ export default function AdminPanel() {
             setIsAuthenticated(true);
         }
 
-        const dbRef = ref(db, 'loading');
+        const dbRef = ref(db, 'loading'); // Το path στη βάση δεδομένων παραμένει ίδιο για να μην χαθούν τα δεδομένα
         const unsubscribe = onValue(dbRef, (snapshot) => {
             const data = snapshot.val() || {};
             const loadedUsers = data.usersList || [{ id: 'guest', name: 'Γκεστ' }];
@@ -581,7 +581,7 @@ export default function AdminPanel() {
 
                 <div className="bg-zinc-950/80 backdrop-blur-3xl border border-zinc-800 rounded-3xl p-10 w-full max-w-sm text-center shadow-[0_0_50px_rgba(255,255,255,0.05)] relative z-10">
                     <div className="relative flex flex-col items-center justify-center mb-10 w-full">
-                        <h1 className="relative z-10 m-0 text-white text-4xl font-black tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]">LOADING</h1>
+                        <h1 className="relative z-10 m-0 text-white text-4xl font-black tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]">RELOAD</h1>
                         <p className="relative z-10 text-zinc-500 text-[0.65rem] tracking-[6px] uppercase mt-2 font-bold m-0">Συστημα Διαχειρισης</p>
                     </div>
 
@@ -617,7 +617,7 @@ export default function AdminPanel() {
                 <nav className="flex flex-col gap-3 bg-zinc-900/80 backdrop-blur-2xl p-4 rounded-[1.5rem] shadow-[0_10px_40px_rgba(0,0,0,0.5)] border border-zinc-800 mb-4">
                     <div className="flex justify-between items-center">
                         <div className="flex flex-col items-start justify-center ml-2">
-                            <span className="text-white text-2xl font-black tracking-tight drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]">LOADING</span>
+                            <span className="text-white text-2xl font-black tracking-tight drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]">RELOAD</span>
                             <span className="text-zinc-500 text-[0.6rem] tracking-[4px] font-bold uppercase mt-1">Πινακας Ελεγχου</span>
                         </div>
                         <button className="bg-zinc-800/80 text-zinc-300 border border-zinc-700/80 rounded-lg px-3 py-2 text-xs font-bold transition-all hover:bg-zinc-700 hover:text-white hover:border-zinc-500 shadow-sm" onClick={handleLogout}>ΕΞΟΔΟΣ</button>
