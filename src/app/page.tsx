@@ -38,20 +38,27 @@ type AppointmentSlotProps = {
     activeAppt: any;
     isFixedBreak: boolean;
     isHighlighted: boolean;
+    isGuest: boolean;
     onUpdate: (payload: any) => void;
 };
 
 // --- Helpers ---
 const formatDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const formatGreekDate = (dStr: string) => {
+    const d = new Date(dStr);
+    return `${shortDays[d.getDay()]} ${d.getDate()} ${shortMonths[d.getMonth()]}`;
+};
 
 // --- Component για κάθε Ραντεβού ---
-function AppointmentSlot({ time, activeAppt, isFixedBreak, isHighlighted, onUpdate }: AppointmentSlotProps) {
+function AppointmentSlot({ time, activeAppt, isFixedBreak, isHighlighted, isGuest, onUpdate }: AppointmentSlotProps) {
     const [localName, setLocalName] = useState(activeAppt?.name || '');
     const [localComment, setLocalComment] = useState(activeAppt?.comment || '');
+    const [localDuration, setLocalDuration] = useState<number>(activeAppt?.duration || 30);
     const [confirmCancel, setConfirmCancel] = useState(false);
 
     useEffect(() => { setLocalName(activeAppt?.name || ''); }, [activeAppt?.name]);
     useEffect(() => { setLocalComment(activeAppt?.comment || ''); }, [activeAppt?.comment]);
+    useEffect(() => { if (activeAppt?.duration) setLocalDuration(activeAppt.duration); }, [activeAppt?.duration]);
 
     let nameVal = activeAppt?.name || '';
     let status = activeAppt?.status || 'PENDING';
@@ -59,7 +66,6 @@ function AppointmentSlot({ time, activeAppt, isFixedBreak, isHighlighted, onUpda
 
     if (!nameVal && isFixedBreak) nameVal = 'ΣΤΑΘΕΡΟ ΔΙΑΛΕΙΜΜΑ';
 
-    // Dark White-Neon Styling
     let cardClass = 'bg-zinc-900/60 border-zinc-800 shadow-[0_4px_24px_rgba(0,0,0,0.5)]';
     let indicatorClass = 'bg-zinc-600 border border-zinc-500 shadow-[0_0_8px_rgba(255,255,255,0.1)]';
     let inputColorClass = 'text-white';
@@ -91,6 +97,9 @@ function AppointmentSlot({ time, activeAppt, isFixedBreak, isHighlighted, onUpda
             <div className="flex gap-4">
                 <div className="flex flex-col items-center justify-start mt-1 shrink-0 w-[50px]">
                     <span className={`text-xl font-black tracking-tight drop-shadow-md ${nameVal === 'ΣΤΑΘΕΡΟ ΔΙΑΛΕΙΜΜΑ' || nameVal === 'ΔΙΑΛΕΙΜΜΑ' ? 'text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]'}`}>{time}</span>
+                    {activeAppt?.duration && (
+                        <span className="text-[0.65rem] font-bold text-zinc-500 mt-0.5">{activeAppt.duration}'</span>
+                    )}
                 </div>
                 <div className={`w-1.5 rounded-full shrink-0 ${indicatorClass}`}></div>
                 
@@ -100,7 +109,7 @@ function AppointmentSlot({ time, activeAppt, isFixedBreak, isHighlighted, onUpda
                         placeholder="Όνομα πελάτη..." 
                         readOnly={nameVal === 'ΣΤΑΘΕΡΟ ΔΙΑΛΕΙΜΜΑ'}
                         onChange={e => setLocalName(e.target.value)} 
-                        onBlur={() => { if (localName !== (activeAppt?.name || '')) onUpdate({ name: localName, status: status }) }}
+                        onBlur={() => { if (localName !== (activeAppt?.name || '')) onUpdate({ name: localName, status: status, duration: isGuest ? localDuration : undefined }) }}
                     />
                     {showDetails && (
                         <input type="text" className={`w-full px-3 py-2 rounded-lg border text-sm outline-none transition-colors shadow-inner ${isCompleted ? 'bg-zinc-900/50 border-zinc-800 text-zinc-600 line-through' : 'bg-black/40 border-zinc-700/50 text-zinc-300 focus:bg-black/60 focus:border-white/60 focus:shadow-[0_0_10px_rgba(255,255,255,0.2)]'}`}
@@ -113,23 +122,46 @@ function AppointmentSlot({ time, activeAppt, isFixedBreak, isHighlighted, onUpda
                 </div>
             </div>
             
-            <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-zinc-800/80 h-[53px]">
-                {confirmCancel ? (
-                    <div className="flex items-center justify-between w-full animate-slideUp">
-                        <span className="text-[0.7rem] font-bold text-red-500 ml-1 uppercase tracking-widest drop-shadow-[0_0_5px_rgba(239,68,68,0.5)]">Σιγουρα;</span>
-                        <div className="flex gap-2">
-                            <button onClick={() => setConfirmCancel(false)} className="px-4 h-[40px] flex items-center justify-center rounded-xl bg-zinc-800 text-zinc-300 font-bold text-xs shadow-sm hover:bg-zinc-700 hover:text-white transition-all active:scale-95 border border-zinc-600">ΑΚΥΡΟ</button>
-                            <button onClick={() => { onUpdate({ isCancelled: true, name: '' }); setConfirmCancel(false); }} className="px-4 h-[40px] flex items-center justify-center rounded-xl bg-red-600/20 text-red-500 border border-red-500 font-bold text-xs shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:bg-red-500 hover:text-white transition-all active:scale-95">ΔΙΑΓΡΑΦΗ</button>
+            <div className="flex justify-between items-center mt-4 pt-3 border-t border-zinc-800/80 min-h-[53px]">
+                {/* Duration Selector (Left side) - ΜΟΝΟ ΓΙΑ GUEST */}
+                <div className="flex-1">
+                    {isGuest && nameVal !== 'ΣΤΑΘΕΡΟ ΔΙΑΛΕΙΜΜΑ' && nameVal !== 'ΔΙΑΛΕΙΜΜΑ' && !isCompleted && !confirmCancel && (
+                        <div className="flex gap-1.5">
+                            {[15, 30, 35, 45].map(dur => (
+                                <button
+                                    key={dur}
+                                    onClick={() => {
+                                        setLocalDuration(dur);
+                                        if (localName || nameVal) {
+                                            onUpdate({ name: localName || nameVal, comment: localComment, status, duration: dur });
+                                        }
+                                    }}
+                                    className={`w-[34px] h-[34px] flex items-center justify-center text-[0.65rem] font-bold rounded-xl transition-all border ${localDuration === dur ? 'bg-white text-black border-white shadow-[0_0_10px_rgba(255,255,255,0.6)] scale-110' : 'bg-black/40 text-zinc-500 border-zinc-800 hover:border-zinc-500 hover:text-zinc-300'}`}
+                                >
+                                    {dur}'
+                                </button>
+                            ))}
                         </div>
-                    </div>
-                ) : (
-                    <>
-                        <button onClick={() => onUpdate({ status: status === 'APPROVED' ? 'PENDING' : 'APPROVED' })} className={`w-[40px] h-[40px] flex items-center justify-center rounded-xl border transition-all shadow-sm active:scale-95 ${status === 'APPROVED' ? 'bg-white/20 border-white text-white shadow-[0_0_15px_rgba(255,255,255,0.4)]' : 'bg-zinc-900/80 border-zinc-700 text-zinc-400 hover:text-white hover:border-white/80 hover:shadow-[0_0_10px_rgba(255,255,255,0.3)]'}`}>✓</button>
-                        <button onClick={() => onUpdate({ isCompleted: !isCompleted })} className={`w-[40px] h-[40px] flex items-center justify-center rounded-xl border transition-all shadow-sm active:scale-95 ${isCompleted ? 'bg-zinc-700/50 border-zinc-500 text-zinc-200 shadow-[0_0_10px_rgba(255,255,255,0.2)]' : 'bg-zinc-900/80 border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 hover:shadow-[0_0_10px_rgba(255,255,255,0.2)]'}`}>✔</button>
-                        <button onClick={() => onUpdate({ name: 'ΔΙΑΛΕΙΜΜΑ', comment: '' })} className="w-[40px] h-[40px] flex items-center justify-center rounded-xl bg-zinc-900/80 border border-zinc-700 text-zinc-400 shadow-sm hover:text-white hover:border-zinc-500 transition-all active:scale-95">॥</button>
-                        <button onClick={() => setConfirmCancel(true)} className="w-[40px] h-[40px] flex items-center justify-center rounded-xl bg-red-950/30 border border-red-900/50 text-red-500 shadow-sm hover:bg-red-500/20 hover:border-red-500 hover:shadow-[0_0_10px_rgba(239,68,68,0.4)] transition-all active:scale-95">✕</button>
-                    </>
-                )}
+                    )}
+                </div>
+
+                {/* Actions (Right side) */}
+                <div className="flex gap-2 justify-end">
+                    {confirmCancel ? (
+                        <div className="flex items-center gap-2 animate-slideUp">
+                            <span className="text-[0.65rem] font-bold text-red-500 uppercase tracking-widest drop-shadow-[0_0_5px_rgba(239,68,68,0.5)] mr-2">Σιγουρα;</span>
+                            <button onClick={() => setConfirmCancel(false)} className="px-3 h-[40px] flex items-center justify-center rounded-xl bg-zinc-800 text-zinc-300 font-bold text-xs shadow-sm hover:bg-zinc-700 hover:text-white transition-all active:scale-95 border border-zinc-600">ΑΚΥΡΟ</button>
+                            <button onClick={() => { onUpdate({ isCancelled: true, name: '' }); setConfirmCancel(false); }} className="px-3 h-[40px] flex items-center justify-center rounded-xl bg-red-600/20 text-red-500 border border-red-500 font-bold text-xs shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:bg-red-500 hover:text-white transition-all active:scale-95">ΔΙΑΓΡΑΦΗ</button>
+                        </div>
+                    ) : (
+                        <>
+                            <button onClick={() => onUpdate({ status: status === 'APPROVED' ? 'PENDING' : 'APPROVED' })} className={`w-[40px] h-[40px] flex items-center justify-center rounded-xl border transition-all shadow-sm active:scale-95 ${status === 'APPROVED' ? 'bg-white/20 border-white text-white shadow-[0_0_15px_rgba(255,255,255,0.4)]' : 'bg-zinc-900/80 border-zinc-700 text-zinc-400 hover:text-white hover:border-white/80 hover:shadow-[0_0_10px_rgba(255,255,255,0.3)]'}`}>✓</button>
+                            <button onClick={() => onUpdate({ isCompleted: !isCompleted })} className={`w-[40px] h-[40px] flex items-center justify-center rounded-xl border transition-all shadow-sm active:scale-95 ${isCompleted ? 'bg-zinc-700/50 border-zinc-500 text-zinc-200 shadow-[0_0_10px_rgba(255,255,255,0.2)]' : 'bg-zinc-900/80 border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 hover:shadow-[0_0_10px_rgba(255,255,255,0.2)]'}`}>✔</button>
+                            <button onClick={() => onUpdate({ name: 'ΔΙΑΛΕΙΜΜΑ', comment: '' })} className="w-[40px] h-[40px] flex items-center justify-center rounded-xl bg-zinc-900/80 border border-zinc-700 text-zinc-400 shadow-sm hover:text-white hover:border-zinc-500 transition-all active:scale-95">॥</button>
+                            <button onClick={() => setConfirmCancel(true)} className="w-[40px] h-[40px] flex items-center justify-center rounded-xl bg-red-950/30 border border-red-900/50 text-red-500 shadow-sm hover:bg-red-500/20 hover:border-red-500 hover:shadow-[0_0_10px_rgba(239,68,68,0.4)] transition-all active:scale-95">✕</button>
+                        </>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -145,7 +177,7 @@ export default function AdminPanel() {
     const [currentDateObj, setCurrentDateObj] = useState<Date>(() => new Date());
 
     const dateStr = formatDateStr(currentDateObj);
-    const dayOfWeek = currentDateObj.getDay();
+    const dayOfWeek = currentDateObj.getDay(); 
 
     // Multi-User States
     const [usersList, setUsersList] = useState<{id: string, name: string}[]>([{ id: 'guest', name: 'Γκεστ' }]);
@@ -170,11 +202,13 @@ export default function AdminPanel() {
     const [isOverviewOpen, setIsOverviewOpen] = useState(false);
     const [highlightedId, setHighlightedId] = useState<string | null>(null);
     const [isAddingAppointment, setIsAddingAppointment] = useState(false);
-    const [newAppForm, setNewAppForm] = useState({ name: '', comment: '', time: '', service: 'Υπηρεσία' });
+    
+    const [newAppForm, setNewAppForm] = useState({ name: '', comment: '', time: '', service: 'Υπηρεσία', duration: 30 });
     
     const [customH, setCustomH] = useState('12');
     const [customM, setCustomM] = useState('00');
 
+    // Search and Filters
     const [searchTerm, setSearchTerm] = useState('');
     const [showOnlyFree, setShowOnlyFree] = useState(false);
 
@@ -189,12 +223,11 @@ export default function AdminPanel() {
         const dbRef = ref(db, 'loading');
         const unsubscribe = onValue(dbRef, (snapshot) => {
             const data = snapshot.val() || {};
-            
             const loadedUsers = data.usersList || [{ id: 'guest', name: 'Γκεστ' }];
             setUsersList(loadedUsers);
 
             let loadedUserData = data.userData;
-            if (!loadedUserData && (data.appointments || data.schedulesMap || data.customTimes || data.weeklySchedule)) {
+            if (!loadedUserData && (data.appointments || data.weeklySchedule || data.customTimes)) {
                 loadedUserData = {
                     guest: {
                         appointments: data.appointments || {},
@@ -253,6 +286,55 @@ export default function AdminPanel() {
         }
     };
 
+    const saveDailySchedule = (isOpen: boolean, slots: string[]) => {
+        setAllUserData(prev => ({
+            ...prev,
+            [activeUserId]: {
+                ...(prev[activeUserId] || {}),
+                schedulesMap: { ...((prev[activeUserId] || {}).schedulesMap || {}), [dateStr]: { isOpen, slots } }
+            }
+        }));
+        set(ref(db, `loading/userData/${activeUserId}/schedulesMap/${dateStr}`), { isOpen, slots }).catch(console.error);
+    };
+
+    const applyDurationLogic = (startTime: string, duration: number) => {
+        const [hStr, mStr] = startTime.split(':');
+        const startMins = parseInt(hStr, 10) * 60 + parseInt(mStr, 10);
+        const endMins = startMins + duration;
+        const endH = Math.floor(endMins / 60); 
+        const endM = endMins % 60;
+        const endTimeStr = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+        const baseSlots = weeklySchedule[dayOfWeek.toString()]?.slots || defaultScheduleSlots;
+        const maxBaseSlot = [...baseSlots].sort().pop() || "23:59";
+        const daySlots = schedulesMap[dateStr]?.slots || baseSlots;
+        const maxSlotStr = [...daySlots].sort().pop() || maxBaseSlot;
+
+        let updatedDaySlots = [...daySlots];
+
+        const newSlots = updatedDaySlots.filter((s: string) => !(s > startTime && s < endTimeStr));
+        if (newSlots.length !== updatedDaySlots.length) {
+            updatedDaySlots = newSlots;
+            saveDailySchedule(currentDaySchedule.isOpen, updatedDaySlots);
+        }
+
+        if (endTimeStr <= maxSlotStr) {
+            const existingCustoms = customTimes[dateStr] || [];
+            let newCustoms = existingCustoms.filter((s: string) => !(s > startTime && s < endTimeStr));
+            if (!updatedDaySlots.includes(endTimeStr) && !newCustoms.includes(endTimeStr)) {
+                newCustoms.push(endTimeStr);
+                setAllUserData(prev => ({
+                    ...prev,
+                    [activeUserId]: {
+                        ...(prev[activeUserId] || {}),
+                        customTimes: { ...((prev[activeUserId] || {}).customTimes || {}), [dateStr]: newCustoms }
+                    }
+                }));
+                set(ref(db, `loading/userData/${activeUserId}/customTimes/${dateStr}`), newCustoms).catch(console.error);
+            }
+        }
+    };
+
     const updateAppt = (dStr: string, time: string, payload: any) => {
         const currentAppt = appointments[dStr]?.[time] || {};
         const updatedAppt = { ...currentAppt, ...payload };
@@ -275,23 +357,14 @@ export default function AdminPanel() {
         const apptRef = ref(db, `loading/userData/${activeUserId}/appointments/${dStr}/${time}`);
         if (payload.isCancelled) remove(apptRef).catch(console.error);
         else set(apptRef, updatedAppt).catch(console.error);
-    };
 
-    // ΩΡΑΡΙΟ ΣΥΓΚΕΚΡΙΜΕΝΗΣ ΗΜΕΡΑΣ
-    const saveDailySchedule = (isOpen: boolean, slots: string[]) => {
-        setAllUserData(prev => ({
-            ...prev,
-            [activeUserId]: {
-                ...(prev[activeUserId] || {}),
-                schedulesMap: { ...((prev[activeUserId] || {}).schedulesMap || {}), [dateStr]: { isOpen, slots } }
-            }
-        }));
-        set(ref(db, `loading/userData/${activeUserId}/schedulesMap/${dateStr}`), { isOpen, slots }).catch(console.error);
+        if (activeUserId === 'guest' && payload.duration && payload.name && payload.name !== 'ΔΙΑΛΕΙΜΜΑ' && !payload.isCancelled) {
+            applyDurationLogic(time, payload.duration);
+        }
     };
 
     const toggleDayStatus = () => {
-        const newStatus = !currentDaySchedule.isOpen;
-        saveDailySchedule(newStatus, currentDaySchedule.slots);
+        saveDailySchedule(!currentDaySchedule.isOpen, currentDaySchedule.slots);
     };
 
     const toggleSpecificSlot = (slot: string) => {
@@ -312,7 +385,6 @@ export default function AdminPanel() {
         saveDailySchedule(currentDaySchedule.isOpen, []);
     };
 
-    // ΡΥΘΜΙΣΕΙΣ (ΜΟΝΙΜΟ ΕΒΔΟΜΑΔΙΑΙΟ ΩΡΑΡΙΟ)
     const saveWeeklySchedule = (dayIdx: number, isOpen: boolean, slots: string[]) => {
         setAllUserData(prev => ({
             ...prev,
@@ -325,10 +397,9 @@ export default function AdminPanel() {
     };
 
     const applyScheduleToAllDays = () => {
-        if (confirm(`Θέλετε σίγουρα να αντιγράψετε το ωράριο της ${shortDays[activeSettingsDay]} σε ΟΛΕΣ τις ημέρες της εβδομάδας;`)) {
+        if (confirm(`Θέλετε σίγουρα να αντιγράψετε το μόνιμο ωράριο της ${shortDays[activeSettingsDay]} σε ΟΛΕΣ τις ημέρες της εβδομάδας;`)) {
             const currentSettings = weeklySchedule[activeSettingsDay.toString()] || { isOpen: true, slots: defaultScheduleSlots };
             const newWeeklySchedule = { ...weeklySchedule };
-            
             for (let i = 0; i < 7; i++) {
                 newWeeklySchedule[i.toString()] = { isOpen: currentSettings.isOpen, slots: [...currentSettings.slots] };
             }
@@ -369,17 +440,74 @@ export default function AdminPanel() {
             comment: newAppForm.comment.trim() || '-',
             service: newAppForm.service,
             status: 'APPROVED',
-            isCompleted: false
+            isCompleted: false,
+            duration: activeUserId === 'guest' ? newAppForm.duration : null
         });
 
-        if (!(currentDaySchedule.slots || []).includes(newAppForm.time)) {
+        if (activeUserId !== 'guest' && !(currentDaySchedule.slots || []).includes(newAppForm.time)) {
             addCustomTime(dateStr, newAppForm.time);
         }
 
         setIsAddingAppointment(false);
-        setNewAppForm({ name: '', comment: '', time: '', service: 'Υπηρεσία' });
+        setNewAppForm({ name: '', comment: '', time: '', service: 'Υπηρεσία', duration: 30 });
     };
 
+    // --- GLOBAL SEARCH LOGIC ---
+    const searchResults = useMemo(() => {
+        if (!searchTerm.trim()) return [];
+        const term = searchTerm.toLowerCase();
+        let results: any[] = [];
+
+        Object.keys(appointments).forEach(dStr => {
+            Object.keys(appointments[dStr]).forEach(time => {
+                const appt = appointments[dStr][time];
+                if (!appt.isCancelled) {
+                    if ((appt.name && appt.name.toLowerCase().includes(term)) || 
+                        (appt.comment && appt.comment.toLowerCase().includes(term))) {
+                        results.push({ dateStr: dStr, time, ...appt });
+                    }
+                }
+            });
+        });
+
+        return results.sort((a, b) => a.dateStr.localeCompare(b.dateStr) || a.time.localeCompare(b.time));
+    }, [appointments, searchTerm]);
+
+    // --- WEEKLY FREE SLOTS LOGIC ---
+    const weeklyFreeSlots = useMemo(() => {
+        if (!showOnlyFree) return [];
+        let freeDays = [];
+
+        for (let i = 0; i < 7; i++) {
+            let d = new Date(currentDateObj);
+            d.setDate(d.getDate() + i);
+            let dStr = formatDateStr(d);
+            let dDay = d.getDay();
+            
+            let daySch = schedulesMap[dStr] || weeklySchedule[dDay.toString()] || { isOpen: true, slots: defaultScheduleSlots };
+            if (!daySch.isOpen) continue;
+
+            let cTimes = customTimes[dStr] || [];
+            let allT = Array.from(new Set([...daySch.slots, ...cTimes])).sort();
+            
+            let dayFree = allT.filter(t => {
+                let appt = appointments[dStr]?.[t];
+                let perm = permanent[`day_${dDay}`]?.[t] || permanent[dDay.toString()]?.[t];
+                let isCancelled = appt ? !!appt.isCancelled : false;
+                let nameVal = appt ? (appt.name || '') : (perm ? perm.name || '' : '');
+                let isBreak = nameVal === 'ΣΤΑΘΕΡΟ ΔΙΑΛΕΙΜΜΑ' || nameVal === 'ΔΙΑΛΕΙΜΜΑ' || fixedBreaks.includes(t);
+                let isBooked = nameVal !== '' && !isCancelled && !isBreak;
+                return !isBooked && !isBreak;
+            });
+
+            if (dayFree.length > 0) {
+                freeDays.push({ dateObj: d, dateStr: dStr, slots: dayFree });
+            }
+        }
+        return freeDays;
+    }, [showOnlyFree, currentDateObj, schedulesMap, weeklySchedule, customTimes, appointments, permanent, fixedBreaks]);
+
+    // --- DAILY NORMAL SLOTS ---
     const allTimes = useMemo(() => {
         if (!currentDaySchedule.isOpen) return []; 
         let baseSlots = currentDaySchedule.slots || [];
@@ -495,7 +623,6 @@ export default function AdminPanel() {
                         <button className="bg-zinc-800/80 text-zinc-300 border border-zinc-700/80 rounded-lg px-3 py-2 text-xs font-bold transition-all hover:bg-zinc-700 hover:text-white hover:border-zinc-500 shadow-sm" onClick={handleLogout}>ΕΞΟΔΟΣ</button>
                     </div>
 
-                    {/* Users Selector */}
                     <div className="flex gap-2 overflow-x-auto mt-2 pt-3 border-t border-zinc-800/80 pb-1 [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]">
                         {usersList.map(u => (
                             <div 
@@ -524,19 +651,19 @@ export default function AdminPanel() {
 
                     <div className="flex gap-1.5 bg-black/40 p-1.5 rounded-xl mt-3 border border-zinc-800/80 shadow-inner overflow-x-auto [&::-webkit-scrollbar]:hidden">
                         <button 
-                            onClick={() => { setActiveTab('appointments'); setIsAddingAppointment(false); setIsOverviewOpen(false); }} 
+                            onClick={() => { setActiveTab('appointments'); setIsAddingAppointment(false); setIsOverviewOpen(false); setSearchTerm(''); setShowOnlyFree(false); }} 
                             className={`flex-1 min-w-[80px] p-2.5 rounded-lg border font-bold text-xs sm:text-sm transition-all cursor-pointer ${activeTab === 'appointments' ? 'bg-white/20 text-white border-white shadow-[0_0_10px_rgba(255,255,255,0.3)]' : 'bg-transparent border-transparent text-zinc-500 hover:bg-zinc-800 hover:text-white'}`}
                         >
                             Ραντεβού
                         </button>
                         <button 
-                            onClick={() => { setActiveTab('schedule'); setIsAddingAppointment(false); setIsOverviewOpen(false); }} 
+                            onClick={() => { setActiveTab('schedule'); setIsAddingAppointment(false); setIsOverviewOpen(false); setSearchTerm(''); setShowOnlyFree(false); }} 
                             className={`flex-1 min-w-[80px] p-2.5 rounded-lg border font-bold text-xs sm:text-sm transition-all cursor-pointer ${activeTab === 'schedule' ? 'bg-white/20 text-white border-white shadow-[0_0_10px_rgba(255,255,255,0.3)]' : 'bg-transparent border-transparent text-zinc-500 hover:bg-zinc-800 hover:text-white'}`}
                         >
                             Ημέρα
                         </button>
                         <button 
-                            onClick={() => { setActiveTab('settings'); setIsAddingAppointment(false); setIsOverviewOpen(false); }} 
+                            onClick={() => { setActiveTab('settings'); setIsAddingAppointment(false); setIsOverviewOpen(false); setSearchTerm(''); setShowOnlyFree(false); }} 
                             className={`flex-1 min-w-[80px] p-2.5 rounded-lg border font-bold text-xs sm:text-sm transition-all cursor-pointer ${activeTab === 'settings' ? 'bg-white/20 text-white border-white shadow-[0_0_10px_rgba(255,255,255,0.3)]' : 'bg-transparent border-transparent text-zinc-500 hover:bg-zinc-800 hover:text-white'}`}
                         >
                             Ρυθμίσεις
@@ -550,14 +677,14 @@ export default function AdminPanel() {
                                 <input 
                                     type="text" 
                                     value={searchTerm}
-                                    onChange={e => setSearchTerm(e.target.value)}
+                                    onChange={e => { setSearchTerm(e.target.value); setShowOnlyFree(false); }}
                                     className="w-full bg-black/50 border border-zinc-800 rounded-xl text-white py-3 pr-9 pl-9 text-sm outline-none placeholder:text-zinc-600 shadow-inner focus:bg-black focus:border-white focus:shadow-[0_0_10px_rgba(255,255,255,0.3)] transition-all" 
-                                    placeholder="Αναζήτηση..." 
+                                    placeholder="Αναζήτηση παντού..." 
                                 />
                                 {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white font-bold">✕</button>}
                             </div>
                             <button 
-                                onClick={() => setShowOnlyFree(!showOnlyFree)}
+                                onClick={() => { setShowOnlyFree(!showOnlyFree); setSearchTerm(''); }}
                                 className={`rounded-xl px-4 font-bold text-xs uppercase tracking-widest transition-all border ${showOnlyFree ? 'bg-white/20 text-white border-white shadow-[0_0_15px_rgba(255,255,255,0.4)]' : 'bg-black/40 text-zinc-500 border-zinc-800 hover:border-white/50 hover:text-white'}`}
                             >
                                 ΕΛΕΥΘΕΡΑ
@@ -566,110 +693,128 @@ export default function AdminPanel() {
                     )}
                 </nav>
 
-                {/* Calendar Ribbon */}
-                {activeTab !== 'settings' && (
-                    <div className="bg-zinc-900/80 backdrop-blur-2xl border border-zinc-800 rounded-[1.5rem] p-4 flex flex-col gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.5)] mb-4 animate-slideUp">
-                        <div className="flex justify-between items-center px-1">
-                            <h3 className="text-base font-bold text-white m-0 uppercase tracking-wide">{monthsGreek[currentDateObj.getMonth()]} {currentDateObj.getFullYear()}</h3>
-                            <div className="relative w-8 h-8 shrink-0">
-                                <div className="w-full h-full bg-zinc-800 border border-zinc-700 rounded-lg flex justify-center items-center text-white text-lg shadow-[0_0_8px_rgba(255,255,255,0.2)]">📅</div>
-                                <input type="date" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" value={formatDateStr(currentDateObj)} onChange={(e) => {
-                                    setCurrentDateObj(new Date(e.target.value));
-                                    setIsAddingAppointment(false); setIsOverviewOpen(false); setSearchTerm(''); setShowOnlyFree(false);
-                                }} />
-                            </div>
-                        </div>
-                        <div className="flex gap-2.5 overflow-x-auto pb-1.5 snap-x snap-mandatory [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
-                            {Array.from({length: 15}).map((_, i) => {
-                                let d = new Date(); d.setDate(d.getDate() - 2 + i);
-                                let checkStr = formatDateStr(d);
-                                let isSelected = checkStr === dateStr;
-                                let isSunday = d.getDay() === 0;
-                                return (
-                                    <button key={i} className={`snap-center min-w-[65px] flex flex-col items-center justify-center p-2.5 rounded-xl cursor-pointer shrink-0 transition-all border ${
-                                        isSelected ? 'bg-white/20 border-white shadow-[0_0_15px_rgba(255,255,255,0.4)] scale-105' : 'bg-black/40 border-zinc-800 hover:bg-zinc-800'
-                                    }`} onClick={(e) => { e.preventDefault(); setCurrentDateObj(d); setIsAddingAppointment(false); setIsOverviewOpen(false); setSearchTerm(''); setShowOnlyFree(false); }}>
-                                        <span className={`text-[0.65rem] font-bold uppercase tracking-wider mb-0.5 ${isSelected ? 'text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]' : isSunday ? 'text-red-500' : 'text-zinc-500'}`}>{shortDays[d.getDay()]}</span>
-                                        <span className={`text-2xl font-bold mb-0.5 ${isSelected ? 'text-white' : 'text-zinc-300'}`}>{d.getDate()}</span>
-                                        <span className={`text-[0.6rem] font-bold uppercase ${isSelected ? 'text-white' : 'text-zinc-600'}`}>{shortMonths[d.getMonth()]}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
-
-                {/* --- 1. APPOINTMENTS TAB --- */}
-                {activeTab === 'appointments' && (
-                    <>
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                            <button onClick={() => setIsOverviewOpen(!isOverviewOpen)} className="bg-zinc-900/80 backdrop-blur-3xl border border-zinc-800 shadow-sm rounded-2xl p-4 flex flex-col items-center justify-center transition-all active:scale-95 hover:border-white/50 hover:shadow-[0_0_15px_rgba(255,255,255,0.2)]">
-                                <span className="text-[0.65rem] text-zinc-500 font-bold uppercase tracking-widest mb-1">Συνολο</span>
-                                <span className="text-3xl font-bold text-white">{!currentDaySchedule.isOpen ? '-' : stats.total}</span>
-                            </button>
-                            <div className="bg-zinc-900/80 backdrop-blur-3xl border border-zinc-800 shadow-sm rounded-2xl p-4 flex flex-col items-center justify-center">
-                                <span className="text-[0.65rem] text-zinc-500 font-bold uppercase tracking-widest mb-1">Ολοκληρωμενα</span>
-                                <span className={`text-3xl font-bold ${stats.done > 0 ? 'text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]' : 'text-zinc-500'}`}>{!currentDaySchedule.isOpen ? '-' : stats.done}</span>
-                            </div>
-                        </div>
-
-                        <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isOverviewOpen ? 'max-h-[400px] opacity-100 mb-4' : 'max-h-0 opacity-0 mb-0'}`}>
-                            <div className="bg-zinc-900/90 backdrop-blur-3xl border border-white/30 rounded-2xl p-3 space-y-2 max-h-[300px] overflow-y-auto shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-                                {stats.appsList.length === 0 ? <div className="text-center py-4 text-xs text-zinc-500 font-medium">Καμία κράτηση.</div> : stats.appsList.map(app => (
-                                    <button key={app.time} onClick={() => scrollToAppointment(app.time)} className="w-full flex items-center justify-between p-3 bg-black/50 hover:bg-zinc-800 rounded-xl transition-all active:scale-95 border border-zinc-800 shadow-sm">
-                                        <span className="text-white font-bold text-sm drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">{app.time}</span>
-                                        <span className={`text-sm font-bold transition-all ${app.isComp ? 'text-zinc-600 line-through' : 'text-white'}`}>{app.name}</span>
-                                    </button>
+                {/* OVERRIDE VIEWS (Search & Free Slots) */}
+                {searchTerm.trim() !== '' && activeTab === 'appointments' ? (
+                    <div className="animate-slideUp flex flex-col gap-4">
+                        <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-widest ml-2">Αποτελέσματα Αναζήτησης</h2>
+                        {searchResults.length === 0 ? (
+                            <div className="text-center py-10 text-zinc-500 text-sm font-bold bg-zinc-900/40 rounded-xl border border-zinc-800">Δεν βρέθηκαν ραντεβού.</div>
+                        ) : (
+                            <div className="flex flex-col gap-3">
+                                {searchResults.map((res, i) => (
+                                    <div key={i} onClick={() => { setCurrentDateObj(new Date(res.dateStr)); setSearchTerm(''); }} className="bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 cursor-pointer hover:border-white/50 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] transition-all flex flex-col gap-2">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-white font-bold text-sm drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">{formatGreekDate(res.dateStr)} - {res.time}</span>
+                                            <span className={`text-[0.6rem] font-bold px-2 py-1 rounded-md ${res.isCompleted ? 'bg-zinc-800 text-zinc-500' : 'bg-white/20 text-white border border-white'}`}>{res.isCompleted ? 'ΟΛΟΚΛΗΡΩΜΕΝΟ' : 'ΕΝΕΡΓΟ'}</span>
+                                        </div>
+                                        <div>
+                                            <div className={`font-black text-lg ${res.isCompleted ? 'text-zinc-600 line-through' : 'text-zinc-200'}`}>{res.name}</div>
+                                            {res.comment && <div className="text-zinc-500 text-sm">{res.comment}</div>}
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
-                        </div>
+                        )}
+                    </div>
+                ) : showOnlyFree && activeTab === 'appointments' ? (
+                    <div className="animate-slideUp flex flex-col gap-4">
+                        <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-widest ml-2">Ελεύθερα (Επόμενες 7 Ημέρες)</h2>
+                        {weeklyFreeSlots.length === 0 ? (
+                            <div className="text-center py-10 text-zinc-500 text-sm font-bold bg-zinc-900/40 rounded-xl border border-zinc-800">Δεν υπάρχουν ελεύθερες ώρες.</div>
+                        ) : (
+                            <div className="flex flex-col gap-4">
+                                {weeklyFreeSlots.map(day => (
+                                    <div key={day.dateStr} className="bg-zinc-900/60 p-5 rounded-2xl border border-zinc-800">
+                                        <h3 className="text-white font-bold mb-4 drop-shadow-[0_0_5px_rgba(255,255,255,0.4)] capitalize">{formatGreekDate(day.dateStr)}</h3>
+                                        <div className="flex flex-wrap gap-2">
+                                            {day.slots.map(s => (
+                                                <button key={s} onClick={() => { setCurrentDateObj(day.dateObj); setShowOnlyFree(false); }} className="px-3 py-2 rounded-xl text-sm font-bold bg-black/40 text-zinc-300 border border-zinc-700 hover:border-white hover:text-white hover:shadow-[0_0_10px_rgba(255,255,255,0.3)] transition-all">
+                                                    {s}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <>
+                        {/* NORMAL DAILY CALENDAR VIEW */}
+                        {activeTab !== 'settings' && (
+                            <div className="bg-zinc-900/80 backdrop-blur-2xl border border-zinc-800 rounded-[1.5rem] p-4 flex flex-col gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.5)] mb-4 animate-slideUp">
+                                <div className="flex justify-between items-center px-1">
+                                    <h3 className="text-base font-bold text-white m-0 uppercase tracking-wide">{monthsGreek[currentDateObj.getMonth()]} {currentDateObj.getFullYear()}</h3>
+                                    <div className="relative w-8 h-8 shrink-0">
+                                        <div className="w-full h-full bg-zinc-800 border border-zinc-700 rounded-lg flex justify-center items-center text-white text-lg shadow-[0_0_8px_rgba(255,255,255,0.2)]">📅</div>
+                                        <input type="date" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" value={formatDateStr(currentDateObj)} onChange={(e) => {
+                                            setCurrentDateObj(new Date(e.target.value));
+                                            setIsAddingAppointment(false); setIsOverviewOpen(false); setSearchTerm(''); setShowOnlyFree(false);
+                                        }} />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2.5 overflow-x-auto pb-1.5 snap-x snap-mandatory [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
+                                    {Array.from({length: 15}).map((_, i) => {
+                                        let d = new Date(); d.setDate(d.getDate() - 2 + i);
+                                        let checkStr = formatDateStr(d);
+                                        let isSelected = checkStr === dateStr;
+                                        let isSunday = d.getDay() === 0;
+                                        let isToday = checkStr === formatDateStr(new Date());
+                                        return (
+                                            <button key={i} className={`snap-center min-w-[65px] flex flex-col items-center justify-center p-2.5 rounded-xl cursor-pointer shrink-0 transition-all border ${
+                                                isSelected ? 'bg-white/20 border-white shadow-[0_0_15px_rgba(255,255,255,0.4)] scale-105' : 'bg-black/40 border-zinc-800 hover:bg-zinc-800'
+                                            } ${isToday && !isSelected ? 'border-zinc-600' : ''}`} onClick={(e) => { e.preventDefault(); setCurrentDateObj(d); setIsAddingAppointment(false); setIsOverviewOpen(false); setSearchTerm(''); setShowOnlyFree(false); }}>
+                                                <span className={`text-[0.65rem] font-bold uppercase tracking-wider mb-0.5 ${isSelected ? 'text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]' : isSunday ? 'text-red-500' : 'text-zinc-500'}`}>{shortDays[d.getDay()]}</span>
+                                                <span className={`text-2xl font-bold mb-0.5 ${isSelected ? 'text-white' : 'text-zinc-300'}`}>{d.getDate()}</span>
+                                                <span className={`text-[0.6rem] font-bold uppercase ${isSelected ? 'text-white' : 'text-zinc-600'}`}>{shortMonths[d.getMonth()]}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
 
-                        <div className="flex justify-between items-center px-1 border-b border-zinc-800 pb-3 mb-4">
-                            <h2 className="text-sm font-bold text-zinc-500 uppercase tracking-widest m-0 drop-shadow-sm">Κρατησεις</h2>
-                            {currentDaySchedule.isOpen && (
-                                <div className="flex gap-2">
-                                    <button className="bg-zinc-800/80 border border-zinc-700 text-zinc-300 rounded-xl px-3 py-1.5 text-[0.7rem] font-bold hover:bg-zinc-700 hover:text-white active:scale-95 shadow-sm" onClick={() => setActiveModal('ADD_TIME')}>+ ΩΡΑ</button>
-                                    <button className={`border rounded-xl px-3 py-1.5 text-[0.7rem] font-bold active:scale-95 shadow-sm transition-all ${isAddingAppointment ? 'bg-white/20 border-white text-white shadow-[0_0_10px_rgba(255,255,255,0.4)]' : 'bg-white/10 border-white/50 text-white hover:bg-white/20 hover:border-white hover:shadow-[0_0_10px_rgba(255,255,255,0.3)]'}`} onClick={() => setIsAddingAppointment(!isAddingAppointment)}>
-                                        {isAddingAppointment ? 'ΑΚΥΡΩΣΗ' : '+ ΡΑΝΤΕΒΟΥ'}
+                        {/* --- 1. APPOINTMENTS TAB --- */}
+                        {activeTab === 'appointments' && (
+                            <>
+                                <div className="grid grid-cols-2 gap-3 mb-4">
+                                    <button onClick={() => setIsOverviewOpen(!isOverviewOpen)} className="bg-zinc-900/80 backdrop-blur-3xl border border-zinc-800 shadow-sm rounded-2xl p-4 flex flex-col items-center justify-center transition-all active:scale-95 hover:border-white/50 hover:shadow-[0_0_15px_rgba(255,255,255,0.2)]">
+                                        <span className="text-[0.65rem] text-zinc-500 font-bold uppercase tracking-widest mb-1">Συνολο</span>
+                                        <span className="text-3xl font-bold text-white">{!currentDaySchedule.isOpen ? '-' : stats.total}</span>
                                     </button>
+                                    <div className="bg-zinc-900/80 backdrop-blur-3xl border border-zinc-800 shadow-sm rounded-2xl p-4 flex flex-col items-center justify-center">
+                                        <span className="text-[0.65rem] text-zinc-500 font-bold uppercase tracking-widest mb-1">Ολοκληρωμενα</span>
+                                        <span className={`text-3xl font-bold ${stats.done > 0 ? 'text-zinc-300 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]' : 'text-zinc-500'}`}>{!currentDaySchedule.isOpen ? '-' : stats.done}</span>
+                                    </div>
                                 </div>
-                            )}
-                        </div>
 
-                        {isAddingAppointment && (
-                            <form onSubmit={handleCreateAppointment} className="bg-zinc-900/80 border border-white/40 rounded-[1.5rem] p-5 space-y-4 mb-4 shadow-[0_0_20px_rgba(255,255,255,0.15)] animate-slideUp">
-                                <div className="flex flex-col gap-2.5">
-                                    <input type="text" placeholder="Όνομα πελάτη..." value={newAppForm.name} onChange={e => setNewAppForm({...newAppForm, name: e.target.value})} className="w-full bg-black/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder:text-zinc-600 outline-none focus:border-white focus:shadow-[0_0_10px_rgba(255,255,255,0.3)] transition-all" />
-                                    <input type="text" placeholder="Σχόλιο / Υπηρεσία..." value={newAppForm.comment} onChange={e => setNewAppForm({...newAppForm, comment: e.target.value})} className="w-full bg-black/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder:text-zinc-600 outline-none focus:border-white focus:shadow-[0_0_10px_rgba(255,255,255,0.3)] transition-all" />
-                                </div>
-                                <div>
-                                    <label className="block text-[0.65rem] font-bold text-zinc-400 uppercase tracking-widest mb-2">Επιλογη Ωρας</label>
-                                    <div className="flex overflow-x-auto gap-2 pb-2 [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]">
-                                        {allPossibleSlots.map(slot => (
-                                            <button type="button" key={slot} onClick={() => setNewAppForm({...newAppForm, time: slot})} className={`flex-none py-2.5 px-4 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-sm ${newAppForm.time === slot ? 'bg-white border border-white text-black shadow-[0_0_15px_rgba(255,255,255,0.8)]' : 'bg-black/40 text-zinc-400 border border-zinc-800 hover:border-white/50 hover:text-white'}`}>
-                                                {slot}
+                                <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isOverviewOpen ? 'max-h-[400px] opacity-100 mb-4' : 'max-h-0 opacity-0 mb-0'}`}>
+                                    <div className="bg-zinc-900/90 backdrop-blur-3xl border border-white/30 rounded-2xl p-3 space-y-2 max-h-[300px] overflow-y-auto shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                                        {stats.appsList.length === 0 ? <div className="text-center py-4 text-xs text-zinc-500 font-medium">Καμία κράτηση.</div> : stats.appsList.map(app => (
+                                            <button key={app.time} onClick={() => scrollToAppointment(app.time)} className="w-full flex items-center justify-between p-3 bg-black/50 hover:bg-zinc-800 rounded-xl transition-all active:scale-95 border border-zinc-800 shadow-sm">
+                                                <span className="text-white font-bold text-sm drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">{app.time}</span>
+                                                <span className={`text-sm font-bold transition-all ${app.isComp ? 'text-zinc-600 line-through' : 'text-white'}`}>{app.name}</span>
                                             </button>
                                         ))}
                                     </div>
                                 </div>
-                                <button type="submit" className="w-full bg-transparent border border-white text-white hover:bg-white hover:text-black font-extrabold px-6 py-3.5 rounded-xl text-sm active:scale-95 transition-all shadow-[0_0_10px_rgba(255,255,255,0.3)] hover:shadow-[0_0_20px_rgba(255,255,255,0.8)]">ΚΑΤΑΧΩΡΗΣΗ</button>
-                            </form>
-                        )}
 
-                        <div className="flex flex-col gap-3">
-                            {!currentDaySchedule.isOpen ? (
-                                <div className="text-center py-10 text-zinc-500 text-sm font-bold uppercase tracking-widest drop-shadow-sm bg-zinc-900/40 rounded-xl backdrop-blur-md border border-zinc-800">ΤΟ ΚΑΤΑΣΤΗΜΑ ΕΙΝΑΙ ΚΛΕΙΣΤΟ</div>
-                            ) : displayedTimes.length === 0 ? (
-                                <div className="text-center py-10 text-zinc-500 text-sm font-bold drop-shadow-sm bg-zinc-900/40 rounded-xl backdrop-blur-md border border-zinc-800">
-                                    {searchTerm || showOnlyFree ? 'Δεν βρέθηκαν αποτελέσματα με τα τρέχοντα φίλτρα.' : 'Δεν υπάρχουν διαθέσιμες ώρες.'}
+                                <div className="flex flex-col gap-3">
+                                    {!currentDaySchedule.isOpen ? (
+                                        <div className="text-center py-10 text-zinc-500 text-sm font-bold uppercase tracking-widest drop-shadow-sm bg-zinc-900/40 rounded-xl backdrop-blur-md border border-zinc-800">ΤΟ ΚΑΤΑΣΤΗΜΑ ΕΙΝΑΙ ΚΛΕΙΣΤΟ</div>
+                                    ) : displayedTimes.length === 0 ? (
+                                        <div className="text-center py-10 text-zinc-500 text-sm font-bold drop-shadow-sm bg-zinc-900/40 rounded-xl backdrop-blur-md border border-zinc-800">
+                                            Δεν υπάρχουν ραντεβού.
+                                        </div>
+                                    ) : displayedTimes.map(time => {
+                                        const isFixedBreak = fixedBreaks.includes(time);
+                                        const appt = appointments[dateStr]?.[time];
+                                        const perm = permanent[`day_${dayOfWeek}`]?.[time] || permanent[dayOfWeek]?.[time];
+                                        return <AppointmentSlot key={time} time={time} activeAppt={appt && !appt.isCancelled ? appt : (perm ? { name: perm.name, comment: perm.comment, status: 'APPROVED', isCompleted: false, duration: perm.duration } : null)} isFixedBreak={isFixedBreak} isHighlighted={highlightedId === time} isGuest={activeUserId === 'guest'} onUpdate={(payload: any) => updateAppt(dateStr, time, payload)} />
+                                    })}
                                 </div>
-                            ) : displayedTimes.map(time => {
-                                const isFixedBreak = fixedBreaks.includes(time);
-                                const appt = appointments[dateStr]?.[time];
-                                const perm = permanent[`day_${dayOfWeek}`]?.[time] || permanent[dayOfWeek]?.[time];
-                                return <AppointmentSlot key={time} time={time} activeAppt={appt && !appt.isCancelled ? appt : (perm ? { name: perm.name, comment: perm.comment, status: 'APPROVED', isCompleted: false } : null)} isFixedBreak={isFixedBreak} isHighlighted={highlightedId === time} onUpdate={(payload: any) => updateAppt(dateStr, time, payload)} />
-                            })}
-                        </div>
+                            </>
+                        )}
                     </>
                 )}
 
